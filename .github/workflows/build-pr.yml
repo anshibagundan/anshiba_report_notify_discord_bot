@@ -1,0 +1,41 @@
+name: Build and Push to Artifact Registry (PR)
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # コードのチェックアウト
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Docker Buildx のセットアップ
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      # Artifact Registry へログイン
+      - name: Login to Artifact Registry
+        uses: docker/login-action@v2
+        with:
+          registry: us-central1-docker.pkg.dev
+          username: _json_key
+          password: ${{ secrets.GCP_SA_KEY }}
+
+      # Docker イメージのビルド
+      - name: Build Docker image
+        run: |
+          docker buildx build --platform linux/amd64 -t anshiba-report-notify-discord-bot:latest .
+
+      # タグ付け
+      - name: Tag Docker image for Artifact Registry
+        run: |
+          docker tag anshiba-report-notify-discord-bot:latest us-central1-docker.pkg.dev/tough-descent-411304/discord-bot-rehistry/anshiba-report-notify-discord-bot:latest
+
+      # Docker イメージのプッシュ
+      - name: Push Docker image to Artifact Registry
+        run: |
+          docker push us-central1-docker.pkg.dev/tough-descent-411304/discord-bot-rehistry/anshiba-report-notify-discord-bot:latest

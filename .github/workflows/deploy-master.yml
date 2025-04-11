@@ -1,0 +1,32 @@
+name: Deploy to Cloud Run (master)
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # コードのチェックアウト（デプロイで必要な設定ファイル等があれば利用）
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # gcloud CLI のセットアップ
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          version: 'latest'
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          project_id: tough-descent-411304
+
+      # Cloud Run へのデプロイ
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy anshiba-report-notify-discord-bot \
+            --image us-central1-docker.pkg.dev/tough-descent-411304/discord-bot-rehistry/anshiba-report-notify-discord-bot:latest \
+            --region us-central1 \
+            --platform managed \
+            --quiet
