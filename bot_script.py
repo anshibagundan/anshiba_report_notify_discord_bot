@@ -5,24 +5,41 @@ from dotenv import load_dotenv
 from discord.ext import commands
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from flask import Flask
 
+# Flask のセットアップ
 app = Flask(__name__)
 
 load_dotenv()
 
+# 環境変数から各種情報を取得
 DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 PORT = int(os.getenv("PORT", 8080))
 
+# MySQLの接続情報（Cloud SQL パブリックIP接続の場合）
+DB_USER = os.getenv("DB_USER", "root")
+DB_PASS = os.getenv("DB_PASS", "password")
+DB_NAME = os.getenv("DB_NAME", "anshiba_report_notify_discord_bot")
+DB_HOST = os.getenv("DB_HOST", "35.192.14.165")
+DB_PORT = os.getenv("DB_PORT", "3306")
+
+# SQLAlchemyJobStore を利用してジョブ情報を MySQL に永続化
+mysql_connection_string = f"mysql+mysqldb://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+jobstores = {
+    'default': SQLAlchemyJobStore(url=mysql_connection_string)
+}
+scheduler = AsyncIOScheduler(jobstores=jobstores)
+
+# Flask のルートエンドポイント
 @app.route("/")
 def index():
     return "OK", 200
 
+# Discord Bot のセットアップ
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
-
-scheduler = AsyncIOScheduler()
 
 DAY_MAPPING = {
     "日": "sun",
@@ -55,7 +72,7 @@ async def help_schedule(ctx):
 **時間形式：**
 24時間形式（例：09:00、14:30、23:45）
 
-※ !schedule コマンドを実行したチャンネルに定期メッセージがくるようにしています。
+※ !schedule コマンドを実行したチャンネルに定期的にメッセージが送信されます。
 
 **スケジュール一覧の表示**
 
@@ -92,7 +109,7 @@ async def schedule_command(ctx, day=None, time=None, *, message=None):
 
     day_key = day[0]
     if day_key not in DAY_MAPPING:
-        await ctx.send("入力された曜日が無効です。最初の文字が「日」「月」「火」「水」「木」「金」「土」のいずれかであるか確認してください。")
+        await ctx.send("入力された曜日が無効です。最初の文字が「日」「月」「火」「水」「木」「金」「土」のいずれかであることを確認してください。")
         return
 
     try:
@@ -106,7 +123,6 @@ async def schedule_command(ctx, day=None, time=None, *, message=None):
         return
 
     cron_day = DAY_MAPPING[day_key]
-
     scheduler.add_job(
         send_notification,
         CronTrigger(day_of_week=cron_day, hour=hour, minute=minute, timezone="Asia/Tokyo"),
