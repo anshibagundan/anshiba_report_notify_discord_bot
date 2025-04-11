@@ -1,5 +1,8 @@
 import threading
 import os
+import sys
+import datetime
+import asyncio
 import discord
 from dotenv import load_dotenv
 from discord.ext import commands
@@ -8,7 +11,9 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from flask import Flask
 
+# --------------------------------------------------
 # Flask のセットアップ
+# --------------------------------------------------
 app = Flask(__name__)
 
 load_dotenv()
@@ -30,16 +35,18 @@ jobstores = {
 }
 scheduler = AsyncIOScheduler(jobstores=jobstores)
 
-# Flask のルートエンドポイント
 @app.route("/")
 def index():
     return "OK", 200
 
+# --------------------------------------------------
 # Discord Bot のセットアップ
+# --------------------------------------------------
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
+# 対応曜日のマッピング
 DAY_MAPPING = {
     "日": "sun",
     "月": "mon",
@@ -55,7 +62,6 @@ async def help_schedule(ctx):
     """スケジュール機能の使い方を表示します"""
     help_text = """
 レポートの提出期限やイベントのリマインダーなど、特定の曜日と時間にメッセージを送信するスケジュール機能を提供するbotです。
-機能重要なタスクやイベントを忘れずに管理できます。
 
 **スケジュールコマンドの使い方**
 
@@ -70,6 +76,7 @@ async def help_schedule(ctx):
 
 **時間形式：**
 24時間形式（例：09:00、14:30、23:45）
+稼働時間は**8:00～24:00**の間で、1分ごとにスケジュールを設定できます。
 
 ※ !schedule コマンドを実行したチャンネルに定期的にメッセージが送信されます。
 
@@ -79,31 +86,15 @@ async def help_schedule(ctx):
 
 現在設定されている全てのスケジュールを一覧表示します。
 
-
 **スケジュールの削除**
 
 `!remove_schedule <番号>`
 
 一覧表示で確認した番号を指定して、特定のスケジュールを削除します。
-番号は `!list_schedules` で表示されるリストの順番に対応しています。
 
 **使い方の表示**
 `!help_schedule`
-スケジュール機能の使い方を表示します。
-
-**新規機能を作成した場合**
-master以外のブランチでPRを作成してください。
-PRを作成する際は、以下のことを確認してください。
-1. master以外のブランチで開発してください。PRのbaseはmasterにしてください。
-2. コードはローカルで実行できることを確認してください。
-3. PRを作成してください。
-4. PRのレビューを依頼してください。(おそらく自動のはず)
-5. PRのレビューが通ったら、masterにマージしてください。
-6. masterにマージしたら、GitHub Actionsが自動でdocker buildを行い、GCP Artifact Registryにpushします。
-7. GCP Artifact Registryにpushされ、Approveされ、masterにマージされるとGitHub Actionsが自動でGCP Cloud Runにデプロイします。
-
-
-"""
+    """
     await ctx.send(help_text)
 
 @bot.command(name="schedule")
@@ -173,7 +164,7 @@ async def remove_schedule(ctx, index: int = None):
     await ctx.send(f"スケジュール {index} を削除しました。")
 
 async def send_notification(channel_id: int, content: str):
-    """指定のチャンネルへ通知を送る非同期関数"""
+    """指定のチャンネルに通知を送る非同期関数"""
     channel = bot.get_channel(channel_id)
     if channel is None:
         channel = await bot.fetch_channel(channel_id)
@@ -185,6 +176,19 @@ async def on_ready():
     print(f"Logged in as {bot.user}")
     if not scheduler.running:
         scheduler.start()
+    # ここで停止時間帯のチェックタスクをバックグラウンドで起動する
+    bot.loop.create_task(shutdown_check())
+
+async def shutdown_check():
+    """
+    0:00～8:00 の間、停止処理を実施する非同期タスク。
+    この間は処理を停止し，プロセスを終了する
+    """
+    while True:
+        now = datetime.datetime.now().time()
+        if datetime.time(0, 0) <= now < datetime.time(8, 0):
+            sys.exit(0)
+        await asyncio.sleep(60)
 
 def run_discord_bot():
     bot.run(DISCORD_BOT_TOKEN)
