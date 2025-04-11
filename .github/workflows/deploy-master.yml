@@ -10,17 +10,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # コードのチェックアウト（デプロイで必要な設定ファイル等があれば利用）
+      # リポジトリのチェックアウト
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # gcloud CLI のセットアップ
+      # Google Cloud 認証を行う
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      # Cloud SDK のセットアップ（入力は service_account_key ではなく project_id などのみにする）
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v1
         with:
-          version: 'latest'
-          service_account_key: ${{ secrets.GCP_SA_KEY }}
           project_id: tough-descent-411304
+          # 必要に応じてバージョンやインストールコンポーネントも指定可能
+          version: 'latest'
 
       # Cloud Run へのデプロイ
       - name: Deploy to Cloud Run

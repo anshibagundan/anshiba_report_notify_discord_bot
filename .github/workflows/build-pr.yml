@@ -25,10 +25,10 @@ jobs:
           username: _json_key
           password: ${{ secrets.GCP_SA_KEY }}
 
-      # Docker イメージのビルド
+      # Docker イメージのビルド (load フラグを追加)
       - name: Build Docker image
         run: |
-          docker buildx build --platform linux/amd64 -t anshiba-report-notify-discord-bot:latest .
+          docker buildx build --platform linux/amd64 --load -t anshiba-report-notify-discord-bot:latest .
 
       # タグ付け
       - name: Tag Docker image for Artifact Registry

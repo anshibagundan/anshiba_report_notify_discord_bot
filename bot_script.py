@@ -5,12 +5,15 @@ from dotenv import load_dotenv
 from discord.ext import commands
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from flask import Flask
 
+# Flask のセットアップ
 app = Flask(__name__)
 
 load_dotenv()
 
+# 環境変数から各種情報を取得
 DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 PORT = int(os.getenv("PORT", 8080))
 
@@ -32,11 +35,10 @@ scheduler = AsyncIOScheduler(jobstores=jobstores)
 def index():
     return "OK", 200
 
+# Discord Bot のセットアップ
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
-
-scheduler = AsyncIOScheduler()
 
 DAY_MAPPING = {
     "日": "sun",
@@ -69,7 +71,7 @@ async def help_schedule(ctx):
 **時間形式：**
 24時間形式（例：09:00、14:30、23:45）
 
-※ !schedule コマンドを実行したチャンネルに定期メッセージがくるようにしています。
+※ !schedule コマンドを実行したチャンネルに定期的にメッセージが送信されます。
 
 **スケジュール一覧の表示**
 
@@ -90,8 +92,15 @@ async def help_schedule(ctx):
 スケジュール機能の使い方を表示します。
 
 **新規機能を作成した場合**
-git pushしてもデプロイしません。
-デプロイしたい時は卍にメンションしてPRのリンクを貼ってください。
+master以外のブランチでPRを作成してください。
+PRを作成する際は、以下のことを確認してください。
+1. master以外のブランチで開発してください。PRのbaseはmasterにしてください。
+2. コードはローカルで実行できることを確認してください。
+3. PRを作成してください。
+4. PRのレビューを依頼してください。(おそらく自動のはず)
+5. PRのレビューが通ったら、masterにマージしてください。
+6. masterにマージしたら、GitHub Actionsが自動でdocker buildを行い、GCP Artifact Registryにpushします。
+7. GCP Artifact Registryにpushされ、Approveされ、masterにマージされるとGitHub Actionsが自動でGCP Cloud Runにデプロイします。
 
 
 """
@@ -106,7 +115,7 @@ async def schedule_command(ctx, day=None, time=None, *, message=None):
 
     day_key = day[0]
     if day_key not in DAY_MAPPING:
-        await ctx.send("入力された曜日が無効です。最初の文字が「日」「月」「火」「水」「木」「金」「土」のいずれかであるか確認してください。")
+        await ctx.send("入力された曜日が無効です。最初の文字が「日」「月」「火」「水」「木」「金」「土」のいずれかであることを確認してください。")
         return
 
     try:
@@ -120,7 +129,6 @@ async def schedule_command(ctx, day=None, time=None, *, message=None):
         return
 
     cron_day = DAY_MAPPING[day_key]
-
     scheduler.add_job(
         send_notification,
         CronTrigger(day_of_week=cron_day, hour=hour, minute=minute, timezone="Asia/Tokyo"),
