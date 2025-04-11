@@ -19,6 +19,7 @@ def index():
     return "OK", 200
 
 intents = discord.Intents.default()
+intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 scheduler = AsyncIOScheduler()
@@ -33,72 +34,97 @@ DAY_MAPPING = {
     "土": "sat"
 }
 
-class ScheduleModal(discord.ui.Modal, title="スケジュール通知の設定"):
-    day = discord.ui.TextInput(
-        label="曜日 (例：月曜日、火曜日、...)",
-        placeholder="例：火曜日",
-        required=True,
-        max_length=10
+@bot.command(name="help_schedule")
+async def help_schedule(ctx):
+    """スケジュール機能の使い方を表示します"""
+    help_text = """
+**スケジュールコマンドの使い方**
+`!schedule <曜日> <時間> <メッセージ>`
+
+**例：**
+`!schedule 月 14:30 定例ミーティングの時間です`
+`!schedule 金 18:00 今週の作業報告を提出してください`
+
+**対応曜日：**
+日、月、火、水、木、金、土
+
+**時間形式：**
+24時間形式（例：09:00、14:30、23:45）
+"""
+    await ctx.send(help_text)
+
+@bot.command(name="schedule")
+async def schedule_command(ctx, day=None, time=None, *, message=None):
+    """指定した曜日、時刻にメッセージを通知するスケジュールを設定します"""
+    if day is None or time is None or message is None:
+        await ctx.send("引数が不足しています。`!help_schedule` で使い方を確認してください。")
+        return
+
+    day_key = day[0]
+    if day_key not in DAY_MAPPING:
+        await ctx.send("入力された曜日が無効です。最初の文字が「日」「月」「火」「水」「木」「金」「土」のいずれかであるか確認してください。")
+        return
+
+    try:
+        hour_str, minute_str = time.strip().split(":")
+        hour = int(hour_str)
+        minute = int(minute_str)
+        if not (0 <= hour < 24 and 0 <= minute < 60):
+            raise ValueError("時間の値が範囲外です")
+    except Exception:
+        await ctx.send("時間の形式が正しくありません。HH:MM形式で入力してください。")
+        return
+
+    cron_day = DAY_MAPPING[day_key]
+
+    scheduler.add_job(
+        send_notification,
+        CronTrigger(day_of_week=cron_day, hour=hour, minute=minute),
+        args=[ctx.channel.id, message]
     )
-    time = discord.ui.TextInput(
-        label="時間 (24時間形式 HH:MM)",
-        placeholder="例：14:30",
-        required=True,
-        max_length=5
-    )
-    content = discord.ui.TextInput(
-        label="通知する内容",
-        style=discord.TextStyle.long,
-        placeholder="例えば、毎週の定例ミーティング開始のお知らせなど",
-        required=True
-    )
+    await ctx.send(f"{day}曜日 {time} にメッセージを送信するようスケジュールを設定しました。")
 
-    async def on_submit(self, interaction: discord.Interaction):
-        day_input = self.day.value.strip()
-        day_key = day_input[0]
-        if day_key not in DAY_MAPPING:
-            await interaction.response.send_message(
-                "入力された曜日が無効です。最初の文字が「日」「月」「火」「水」「木」「金」「土」のいずれかであるか確認してください。",
-                ephemeral=True
-            )
-            return
+@bot.command(name="list_schedules")
+async def list_schedules(ctx):
+    """現在設定されているスケジュールを表示します"""
+    jobs = scheduler.get_jobs()
+    if not jobs:
+        await ctx.send("現在設定されているスケジュールはありません。")
+        return
 
-        try:
-            hour_str, minute_str = self.time.value.strip().split(":")
-            hour = int(hour_str)
-            minute = int(minute_str)
-            if not (0 <= hour < 24 and 0 <= minute < 60):
-                raise ValueError("時間の値が範囲外です")
-        except Exception:
-            await interaction.response.send_message(
-                "時間の形式が正しくありません。HH:MM形式で入力してください。",
-                ephemeral=True
-            )
-            return
+    response = "**現在設定されているスケジュール**\n"
+    for i, job in enumerate(jobs, 1):
+        trigger = job.trigger
+        args = job.args
+        response += f"{i}. {trigger}: {args[1]}\n"
 
-        message_content = self.content.value.strip()
-        cron_day = DAY_MAPPING[day_key]
+    await ctx.send(response)
 
-        scheduler.add_job(
-            send_notification,
-            CronTrigger(day_of_week=cron_day, hour=hour, minute=minute),
-            args=[interaction.channel.id, message_content]
-        )
-        await interaction.response.send_message("スケジュールされた通知が設定されました。", ephemeral=True)
+@bot.command(name="remove_schedule")
+async def remove_schedule(ctx, index: int = None):
+    """スケジュールを削除します"""
+    if index is None:
+        await ctx.send("削除するスケジュール番号を指定してください。番号は `!list_schedules` で確認できます。")
+        return
+
+    jobs = scheduler.get_jobs()
+    if not jobs:
+        await ctx.send("現在設定されているスケジュールはありません。")
+        return
+
+    if index < 1 or index > len(jobs):
+        await ctx.send(f"無効な番号です。1から{len(jobs)}の間で指定してください。")
+        return
+
+    job_to_remove = jobs[index-1]
+    job_to_remove.remove()
+    await ctx.send(f"スケジュール {index} を削除しました。")
 
 async def send_notification(channel_id: int, content: str):
     """指定のチャンネルへ通知を送る非同期関数"""
     channel = bot.get_channel(channel_id)
-    if channel and isinstance(channel, discord.TextChannel):
+    if channel:
         await channel.send(content)
-
-@bot.slash_command(
-    name="schedule",
-    description="指定した曜日、時刻にメッセージを通知するスケジュールを設定します。"
-)
-async def schedule(interaction: discord.Interaction):
-    modal = ScheduleModal()
-    await interaction.response.send_modal(modal)
 
 @bot.event
 async def on_ready():
