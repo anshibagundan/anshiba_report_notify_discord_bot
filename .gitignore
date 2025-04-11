@@ -1,0 +1,8 @@
+.vscode/
+
+.idea/
+
+# Local history for Visual Studio Code
+.history/
+
+.env
