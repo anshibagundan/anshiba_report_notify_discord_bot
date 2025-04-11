@@ -57,7 +57,7 @@ DAY_MAPPING = {
     "土": "sat"
 }
 
-@bot.command(name="help_schedule")
+@bot.command(name="help")
 async def help_schedule(ctx):
     """スケジュール機能の使い方を表示します"""
     help_text = """
@@ -93,7 +93,7 @@ async def help_schedule(ctx):
 一覧表示で確認した番号を指定して、特定のスケジュールを削除します。
 
 **使い方の表示**
-`!help_schedule`
+`!help`
     """
     await ctx.send(help_text)
 
