@@ -76,8 +76,15 @@ async def help_schedule(ctx):
 スケジュール機能の使い方を表示します。
 
 **新規機能を作成した場合**
-git pushしてもデプロイしません。
-デプロイしたい時は卍にメンションしてPRのリンクを貼ってください。
+master以外のブランチでPRを作成してください。
+PRを作成する際は、以下のことを確認してください。
+1. master以外のブランチで開発してください。PRのbaseはmasterにしてください。
+2. コードはローカルで実行できることを確認してください。
+3. PRを作成してください。
+4. PRのレビューを依頼してください。(おそらく自動のはず)
+5. PRのレビューが通ったら、masterにマージしてください。
+6. masterにマージしたら、GitHub Actionsが自動でdocker buildを行い、GCP Artifact Registryにpushします。
+7. GCP Artifact Registryにpushされ、Approveされ、masterにマージされるとGitHub Actionsが自動でGCP Cloud Runにデプロイします。
 
 
 """
