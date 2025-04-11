@@ -39,6 +39,7 @@ async def help_schedule(ctx):
     """スケジュール機能の使い方を表示します"""
     help_text = """
 **スケジュールコマンドの使い方**
+
 `!schedule <曜日> <時間> <メッセージ>`
 
 **例：**
@@ -50,6 +51,21 @@ async def help_schedule(ctx):
 
 **時間形式：**
 24時間形式（例：09:00、14:30、23:45）
+
+
+**スケジュール一覧の表示**
+
+`!list_schedules`
+
+現在設定されている全てのスケジュールを一覧表示します。
+
+
+**スケジュールの削除**
+
+`!remove_schedule <番号>`
+
+一覧表示で確認した番号を指定して、特定のスケジュールを削除します。
+番号は `!list_schedules` で表示されるリストの順番に対応しています。
 """
     await ctx.send(help_text)
 
@@ -79,7 +95,7 @@ async def schedule_command(ctx, day=None, time=None, *, message=None):
 
     scheduler.add_job(
         send_notification,
-        CronTrigger(day_of_week=cron_day, hour=hour, minute=minute),
+        CronTrigger(day_of_week=cron_day, hour=hour, minute=minute, timezone="Asia/Tokyo"),
         args=[ctx.channel.id, message]
     )
     await ctx.send(f"{day}曜日 {time} にメッセージを送信するようスケジュールを設定しました。")
@@ -116,28 +132,29 @@ async def remove_schedule(ctx, index: int = None):
         await ctx.send(f"無効な番号です。1から{len(jobs)}の間で指定してください。")
         return
 
-    job_to_remove = jobs[index-1]
+    job_to_remove = jobs[index - 1]
     job_to_remove.remove()
     await ctx.send(f"スケジュール {index} を削除しました。")
 
 async def send_notification(channel_id: int, content: str):
     """指定のチャンネルへ通知を送る非同期関数"""
     channel = bot.get_channel(channel_id)
+    if channel is None:
+        channel = await bot.fetch_channel(channel_id)
     if channel:
         await channel.send(content)
 
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user}")
-    scheduler.start()
+    if not scheduler.running:
+        scheduler.start()
 
 def run_discord_bot():
     bot.run(DISCORD_BOT_TOKEN)
 
 if __name__ == "__main__":
-    # Discord Bot を別スレッドで起動
     discord_thread = threading.Thread(target=run_discord_bot)
     discord_thread.start()
 
-    # Flask アプリをメインスレッドで起動
     app.run(host="0.0.0.0", port=PORT)
