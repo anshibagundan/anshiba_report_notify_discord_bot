@@ -14,6 +14,23 @@ load_dotenv()
 DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 PORT = int(os.getenv("PORT", 8080))
 
+<<<<<<< Updated upstream
+=======
+DB_USER = os.getenv("DB_USER")
+DB_PASS = os.getenv("DB_PASS")
+DB_NAME = os.getenv("DB_NAME")
+DB_HOST = os.getenv("DB_HOST")
+DB_PORT = os.getenv("DB_PORT")
+
+# SQLAlchemyJobStore を利用してジョブ情報を MySQL に永続化
+mysql_connection_string = f"mysql+mysqldb://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+jobstores = {
+    'default': SQLAlchemyJobStore(url=mysql_connection_string)
+}
+scheduler = AsyncIOScheduler(jobstores=jobstores)
+
+# Flask のルートエンドポイント
+>>>>>>> Stashed changes
 @app.route("/")
 def index():
     return "OK", 200
