@@ -14,8 +14,6 @@ load_dotenv()
 DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 PORT = int(os.getenv("PORT", 8080))
 
-<<<<<<< Updated upstream
-=======
 DB_USER = os.getenv("DB_USER")
 DB_PASS = os.getenv("DB_PASS")
 DB_NAME = os.getenv("DB_NAME")
@@ -30,7 +28,6 @@ jobstores = {
 scheduler = AsyncIOScheduler(jobstores=jobstores)
 
 # Flask のルートエンドポイント
->>>>>>> Stashed changes
 @app.route("/")
 def index():
     return "OK", 200
